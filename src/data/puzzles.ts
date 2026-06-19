@@ -37,6 +37,33 @@ export interface RiddlePreset {
   difficulty: 'easy' | 'medium' | 'hard';
 }
 
+export interface NegotiationPreset {
+  id: string;
+  merchant: string;
+  item: string;
+  startingPrice: number;
+}
+
+export interface DialectPreset {
+  id: string;
+  style: string;
+  answer: string;
+  fallbackText: string;
+}
+
+export interface HallucinationPreset {
+  id: string;
+  topic: string;
+  facts: string[];
+  fakeIndex: number;
+}
+
+export interface MissingLinkPreset {
+  id: string;
+  wordA: string;
+  wordB: string;
+}
+
 // 1. Semantic Hot & Cold Words Pool
 export const SEMANTIC_POOL: SemanticPreset[] = [
   {
@@ -256,6 +283,78 @@ export const RIDDLE_POOL: RiddlePreset[] = [
     answer: "Window",
     theme: "History & Landmarks",
     difficulty: "easy"
+  }
+];
+
+// 6. Negotiation Speedrun Pool
+export const NEGOTIATION_POOL: NegotiationPreset[] = [
+  {
+    id: "neg-1",
+    merchant: "A grumpy underground goblin",
+    item: "the rusty keys to the dungeon escape hatch",
+    startingPrice: 10000
+  },
+  {
+    id: "neg-2",
+    merchant: "A luxury real estate alien agent",
+    item: "a cardboard box in the neon downtown spaceport",
+    startingPrice: 5000000
+  }
+];
+
+// 7. Dialect Decoder Pool
+export const DIALECT_POOL: DialectPreset[] = [
+  {
+    id: "dial-1",
+    style: "A dramatic Shakespearean actor",
+    answer: "Shrek",
+    fallbackText: "Hark! A verdant ogre of immense girth, content in his mire, whose solitude is broken by a multitude of fairy-tale castaways."
+  },
+  {
+    id: "dial-2",
+    style: "A medieval knight",
+    answer: "Using a microwave",
+    fallbackText: "Behold this sorcerous metal box! Place thy cold mutton within, press the numerics of power, and watch it spin bathed in unseen fire!"
+  }
+];
+
+// 8. Spot the Hallucination Pool
+export const HALLUCINATION_POOL: HallucinationPreset[] = [
+  {
+    id: "hal-1",
+    topic: "Animal Kingdom",
+    facts: [
+      "Wombat droppings are cube-shaped to prevent them from rolling away.",
+      "A group of flamingos is called a flamboyance.",
+      "The fingerprints of a koala are so indistinguishable from humans that they have confused crime scene investigators.",
+      "Sloths can hold their breath for up to 3 hours underwater by slowing their heart rate to 2 beats per minute."
+    ],
+    fakeIndex: 3
+  },
+  {
+    id: "hal-2",
+    topic: "Space Explorations",
+    facts: [
+      "Venus is the only planet in our solar system that spins clockwise.",
+      "One million Earths could fit inside the Sun.",
+      "The Apollo 11 moon landing computers had less processing power than a modern USB-C charger.",
+      "Saturn's rings are made almost entirely of crystallized carbon, making them effectively diamond dust."
+    ],
+    fakeIndex: 3
+  }
+];
+
+// 9. The Missing Link Pool
+export const MISSINGLINK_POOL: MissingLinkPreset[] = [
+  {
+    id: "link-1",
+    wordA: "Bananas",
+    wordB: "The Roman Empire"
+  },
+  {
+    id: "link-2",
+    wordA: "A Coffee Mug",
+    wordB: "Quantum Physics"
   }
 ];
 

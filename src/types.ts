@@ -4,6 +4,10 @@ export enum GameType {
   ZEITGEIST = 'zeitgeist',
   DETECTIVE = 'detective',
   RIDDLE = 'riddle',
+  NEGOTIATION = 'negotiation',
+  DIALECT = 'dialect',
+  HALLUCINATION = 'hallucination',
+  MISSINGLINK = 'missinglink',
 }
 
 export interface UserProfile {

@@ -10,6 +10,10 @@ import {
   ZEITGEIST_POOL,
   DETECTIVE_POOL,
   RIDDLE_POOL,
+  NEGOTIATION_POOL,
+  DIALECT_POOL,
+  HALLUCINATION_POOL,
+  MISSINGLINK_POOL,
   getSeededIndex
 } from './src/data/puzzles.ts';
 
@@ -661,7 +665,202 @@ Generate a unique, elegant riddle with a simple single-word answer.`;
   });
 });
 
-// 10. Submit Score to Leaderboard
+// 10. Negotiation Game Endpoint
+app.post('/api/games/negotiation/barter', async (req, res) => {
+  const { pitch, isInfinite, activeIndex, history } = req.body;
+  if (!pitch) return res.status(400).json({ error: "Missing pitch" });
+
+  const ai = getGeminiClient();
+  const preset = NEGOTIATION_POOL[isInfinite ? activeIndex % NEGOTIATION_POOL.length : getSeededIndex(new Date().toISOString().split('T')[0], NEGOTIATION_POOL.length)];
+  const merchant = preset.merchant;
+  const item = preset.item;
+  const startPrice = preset.startingPrice;
+
+  // Determine current price based on history length if fallback
+  let fallbackPrice = startPrice - (history.length * 50);
+
+  if (!ai) {
+    return res.json({
+      reply: "Grumble grumble... fine. Take it or leave it.",
+      newPrice: fallbackPrice - 100,
+      dealAccepted: history.length >= 2,
+      startingPrice: startPrice
+    });
+  }
+
+  try {
+    const chatHistoryText = history.map((m: any) => `${m.role === 'user' ? 'Buyer' : 'Merchant'}: ${m.text}`).join('\n');
+    const prompt = `You are playing a role in a negotiation game.
+Your Character: ${merchant}
+Selling: ${item}
+Initial Asking Price: ${startPrice} gold
+
+Previous conversation:
+${chatHistoryText}
+Buyer just said: "${pitch}"
+
+Evaluate if you should lower the price, hold firm, or accept the deal based on the buyer's logic, charm, or humor.
+Respond in JSON format with:
+- "reply": Your character's in-character response to the buyer.
+- "newPrice": The new numerical asking price in gold (must be a number, can be the same, lower, or 0 if accepted).
+- "dealAccepted": boolean (true if you agree to their terms and close the deal).`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            reply: { type: Type.STRING },
+            newPrice: { type: Type.INTEGER },
+            dealAccepted: { type: Type.BOOLEAN }
+          },
+          required: ["reply", "newPrice", "dealAccepted"]
+        }
+      }
+    });
+
+    const parsed = JSON.parse(response.text?.trim() || "{}");
+    return res.json({
+      reply: parsed.reply || "I don't know what to say to that.",
+      newPrice: parsed.newPrice || fallbackPrice,
+      dealAccepted: parsed.dealAccepted || false,
+      startingPrice: startPrice
+    });
+  } catch (err) {
+    console.error("Negotiation error:", err);
+    res.json({ reply: "Comm distortion...", newPrice: fallbackPrice, dealAccepted: false, startingPrice: startPrice });
+  }
+});
+
+// 11. Dialect Decoder Endpoints
+app.post('/api/games/dialect/get', (req, res) => {
+  const { isInfinite, activeIndex } = req.body;
+  const preset = DIALECT_POOL[isInfinite ? activeIndex % DIALECT_POOL.length : getSeededIndex(new Date().toISOString().split('T')[0], DIALECT_POOL.length)];
+  res.json({ style: preset.style, text: preset.fallbackText });
+});
+
+app.post('/api/games/dialect/guess', async (req, res) => {
+  const { guess, isInfinite, activeIndex } = req.body;
+  const ai = getGeminiClient();
+  const preset = DIALECT_POOL[isInfinite ? activeIndex % DIALECT_POOL.length : getSeededIndex(new Date().toISOString().split('T')[0], DIALECT_POOL.length)];
+
+  if (guess.toLowerCase() === preset.answer.toLowerCase()) {
+    return res.json({ correct: true, feedback: `Exact match! The answer was ${preset.answer}.` });
+  }
+
+  if (!ai) {
+    return res.json({ correct: false, feedback: "Incorrect. Try again." });
+  }
+
+  try {
+    const prompt = `The target answer is "${preset.answer}". 
+The user guessed "${guess}".
+Did the user correctly identify or closely guess the target subject conceptually?
+Provide a JSON response:
+- "correct": true/false
+- "feedback": A short hint or confirmation.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            correct: { type: Type.BOOLEAN },
+            feedback: { type: Type.STRING }
+          },
+          required: ["correct", "feedback"]
+        }
+      }
+    });
+
+    const parsed = JSON.parse(response.text?.trim() || "{}");
+    res.json(parsed);
+  } catch (err) {
+    console.error(err);
+    res.json({ correct: false, feedback: "Error evaluating." });
+  }
+});
+
+// 12. Spot the Hallucination Endpoint
+app.post('/api/games/hallucination/get', (req, res) => {
+  const { isInfinite, activeIndex } = req.body;
+  const preset = HALLUCINATION_POOL[isInfinite ? activeIndex % HALLUCINATION_POOL.length : getSeededIndex(new Date().toISOString().split('T')[0], HALLUCINATION_POOL.length)];
+  res.json({ topic: preset.topic, facts: preset.facts, fakeIndex: preset.fakeIndex });
+});
+
+// 13. Missing Link Endpoints
+app.post('/api/games/missinglink/get', (req, res) => {
+  const { isInfinite, activeIndex } = req.body;
+  const preset = MISSINGLINK_POOL[isInfinite ? activeIndex % MISSINGLINK_POOL.length : getSeededIndex(new Date().toISOString().split('T')[0], MISSINGLINK_POOL.length)];
+  res.json({ wordA: preset.wordA, wordB: preset.wordB });
+});
+
+app.post('/api/games/missinglink/score', async (req, res) => {
+  const { sentence, isInfinite, activeIndex } = req.body;
+  const ai = getGeminiClient();
+  const preset = MISSINGLINK_POOL[isInfinite ? activeIndex % MISSINGLINK_POOL.length : getSeededIndex(new Date().toISOString().split('T')[0], MISSINGLINK_POOL.length)];
+
+  if (!sentence) return res.status(400).json({ error: "Missing sentence" });
+
+  if (!ai) {
+    const aLower = preset.wordA.toLowerCase();
+    const bLower = preset.wordB.toLowerCase();
+    const sentLower = sentence.toLowerCase();
+    const hasBoth = sentLower.includes(aLower) && sentLower.includes(bLower);
+    
+    return res.json({
+      score: hasBoth ? 75 : 0,
+      explanation: hasBoth ? "Valid connection found (fallback evaluation). Both words are present." : "Your sentence does not contain both target words clearly."
+    });
+  }
+
+  try {
+    const prompt = `Game: The Missing Link. Let's act as a semantic referee.
+Words to connect: "${preset.wordA}" and "${preset.wordB}".
+User's sentence: "${sentence}"
+
+Evaluate if the sentence:
+1. Actually includes both concepts (or their direct variations).
+2. Is a cohesive, logically sound sentence (not just gibberish connecting them).
+
+Score the connection from 0 to 100 based on grammatical correctness, creativity, and logical flow.
+A score >= 50 means PASS. < 50 means REJECT.
+
+Return JSON:
+- "score": numerical score (0-100)
+- "explanation": a short snappy review of their sentence logic.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            score: { type: Type.INTEGER },
+            explanation: { type: Type.STRING }
+          },
+          required: ["score", "explanation"]
+        }
+      }
+    });
+
+    const parsed = JSON.parse(response.text?.trim() || "{}");
+    res.json({ score: parsed.score || 0, explanation: parsed.explanation || "Error parsing." });
+  } catch (err) {
+    console.error(err);
+    res.json({ score: 0, explanation: "Gemini referee is offline." });
+  }
+});
+
+// 14. Submit Score to Leaderboard
 app.post('/api/games/leaderboard/submit', (req, res) => {
   const { username, gameType, score, timeTaken, guessesCount, date } = req.body;
   if (!username) {

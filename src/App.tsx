@@ -29,6 +29,10 @@ import PromptDetectiveGame from './components/PromptDetectiveGame';
 import EmojiZeitgeistGame from './components/EmojiZeitgeistGame';
 import DailyDetectiveGame from './components/DailyDetectiveGame';
 import CalibrationRiddleGame from './components/CalibrationRiddleGame';
+import NegotiationGame from './components/NegotiationGame';
+import DialectDecoderGame from './components/DialectDecoderGame';
+import HallucinationGame from './components/HallucinationGame';
+import MissingLinkGame from './components/MissingLinkGame';
 
 export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -109,13 +113,27 @@ export default function App() {
     synth.playTargetSound('win');
     
     // Update local stats
-    const todayStr = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    let newStreak = stats.currentStreak;
+    if (!stats.completedGames.includes(todayStr)) {
+      if (stats.completedGames.includes(yesterdayStr) || stats.currentStreak === 0) {
+        newStreak += 1;
+      } else {
+        newStreak = 1;
+      }
+    }
+
     const newStats = {
       playedCount: stats.playedCount + 1,
       wonCount: stats.wonCount + 1,
-      currentStreak: stats.completedGames.includes(todayStr) ? stats.currentStreak : stats.currentStreak + 1,
-      maxStreak: Math.max(stats.maxStreak, stats.currentStreak + 1),
-      completedGames: [...stats.completedGames, todayStr]
+      currentStreak: newStreak,
+      maxStreak: Math.max(stats.maxStreak, newStreak),
+      completedGames: [...new Set([...stats.completedGames, todayStr])]
     };
 
     setStats(newStats);
@@ -156,8 +174,12 @@ export default function App() {
       case GameType.SEMANTIC: return "Synonym Seekers (Semantic Match)";
       case GameType.PROMPT: return "Prompt Detective (AI Art Decipher)";
       case GameType.ZEITGEIST: return "Emoji Zeitgeist (Trend Translator)";
-      case GameType.DETECTIVE: return "Daily Detective (5-Question Mystery)";
+      case GameType.DETECTIVE: return "Daily Detective (10-Question Mystery)";
       case GameType.RIDDLE: return "Adaptive Riddle Calibration Oracle";
+      case GameType.NEGOTIATION: return "The Art of the Deal (Negotiation)";
+      case GameType.DIALECT: return "Dialect Decoder (The Stylized Plot)";
+      case GameType.HALLUCINATION: return "Spot the Hallucination (Fact or Fib)";
+      case GameType.MISSINGLINK: return "The Missing Link (Connections)";
     }
   };
 
@@ -264,6 +286,10 @@ export default function App() {
                 { type: GameType.ZEITGEIST, label: "Emoji Zeitgeist ⚡", tag: "Pop Culture" },
                 { type: GameType.DETECTIVE, label: "Daily Detective 🔎", tag: "Mystery" },
                 { type: GameType.RIDDLE, label: "Riddle Sphinx 🔮", tag: "Sphinx Adaptive" },
+                { type: GameType.NEGOTIATION, label: "Art of Deal 🤝", tag: "Negotiate" },
+                { type: GameType.DIALECT, label: "Dialect Decoder 🎭", tag: "Dialects" },
+                { type: GameType.HALLUCINATION, label: "Fact or Fib 🕵️", tag: "Fact check" },
+                { type: GameType.MISSINGLINK, label: "Missing Link 🔗", tag: "Links" },
               ].map((tab) => {
                 const isActive = activeTab === tab.type;
                 return (
@@ -367,6 +393,34 @@ export default function App() {
                 username={profile?.username || "GuestSolver"}
                 interests={profile?.interests || ["Science"]}
                 difficulty={profile?.difficulty || "medium"}
+                onSuccess={handleGameSuccess}
+              />
+            )}
+            {activeTab === GameType.NEGOTIATION && (
+              <NegotiationGame
+                isInfinite={isInfinite}
+                username={profile?.username || "GuestSolver"}
+                onSuccess={handleGameSuccess}
+              />
+            )}
+            {activeTab === GameType.DIALECT && (
+              <DialectDecoderGame
+                isInfinite={isInfinite}
+                username={profile?.username || "GuestSolver"}
+                onSuccess={handleGameSuccess}
+              />
+            )}
+            {activeTab === GameType.HALLUCINATION && (
+              <HallucinationGame
+                isInfinite={isInfinite}
+                username={profile?.username || "GuestSolver"}
+                onSuccess={handleGameSuccess}
+              />
+            )}
+            {activeTab === GameType.MISSINGLINK && (
+              <MissingLinkGame
+                isInfinite={isInfinite}
+                username={profile?.username || "GuestSolver"}
                 onSuccess={handleGameSuccess}
               />
             )}

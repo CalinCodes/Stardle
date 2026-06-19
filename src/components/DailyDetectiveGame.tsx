@@ -45,7 +45,7 @@ export default function DailyDetectiveGame({ isInfinite, username, onSuccess }: 
   const submitQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!question.trim()) return;
-    if (questions.length >= 5) {
+    if (questions.length >= 10) {
       setFeedback('⚠️ Interrogation budget exhausted! You must submit your final Detective explanation now!');
       synth.playTargetSound('wrong');
       return;
@@ -124,7 +124,7 @@ export default function DailyDetectiveGame({ isInfinite, username, onSuccess }: 
         <HelpIcon className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
         <div className="text-xs text-stone-700 leading-relaxed font-mono">
           <span className="font-bold text-yellow-950 block mb-1">DAILY DETECTIVE CASEFILE</span>
-          You are presented with a cryptic murder or strange incident block. Interrogate the AI Game Master. You are allowed exactly 5 free-form questions which can only return YES, NO, or IRRELEVANT. When you're ready, draft your solution!
+          You are presented with a cryptic murder or strange incident block. Interrogate the AI Game Master. You are allowed exactly 10 free-form questions which can only return YES, NO, or IRRELEVANT. When you're ready, draft your solution!
         </div>
       </div>
 
@@ -153,7 +153,7 @@ export default function DailyDetectiveGame({ isInfinite, username, onSuccess }: 
               </p>
             </div>
             <div className="text-[10px] text-stone-400 font-mono text-right mt-3">
-              Budget: {5 - questions.length} of 5 questions remaining
+              Budget: {10 - questions.length} of 10 questions remaining
             </div>
           </div>
 
@@ -196,7 +196,7 @@ export default function DailyDetectiveGame({ isInfinite, username, onSuccess }: 
               </div>
 
               {/* Interrogate Form */}
-              {!solved && questions.length < 5 && (
+              {!solved && questions.length < 10 && (
                 <form onSubmit={submitQuestion} className="flex flex-col gap-1.5">
                   <span className="font-mono text-[9px] text-stone-400 tracking-wider uppercase block">Ask a Question</span>
                   <div className="flex gap-1.5">
