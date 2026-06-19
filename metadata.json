@@ -1,0 +1,6 @@
+{
+  "name": "Stardle",
+  "description": "A personalized daily-puzzle platform powered by Gemini AI. Decipher AI artworks, discover synonyms with semantic hot/cold matching, decode pop culture trends, interrogate detective mysteries, and calibrate adaptive sphinx riddles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
