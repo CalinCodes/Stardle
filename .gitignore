@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Persistent local data store
+.data/
+
+# Build output
+dist/
+server.js
+
+# Logs & OS
+*.log
+.DS_Store

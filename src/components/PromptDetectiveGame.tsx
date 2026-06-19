@@ -62,7 +62,7 @@ export default function PromptDetectiveGame({ isInfinite, username, onSuccess }:
 
         if (result.isCorrect || result.similarity >= 85) {
           synth.playTargetSound('win');
-          onSuccess(Math.max(15, 120 - updated.length * 5 - hintLevel * 15), updated.length);
+          onSuccess(Math.max(5, 100 - updated.length * 12 - hintLevel * 18), updated.length);
         } else {
           synth.playTargetSound('click');
         }

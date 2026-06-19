@@ -1,4 +1,5 @@
 export enum GameType {
+  FORGE = 'forge',
   SEMANTIC = 'semantic',
   PROMPT = 'prompt',
   ZEITGEIST = 'zeitgeist',
@@ -8,6 +9,20 @@ export enum GameType {
   DIALECT = 'dialect',
   HALLUCINATION = 'hallucination',
   MISSINGLINK = 'missinglink',
+}
+
+// AI Forge: infinite, interest-driven generated games
+export type ForgeFormat = 'codex' | 'wordgrid' | 'connections' | 'sudoku' | 'quiz' | 'zip' | 'queens';
+
+export interface ForgedGame {
+  id: string;
+  format: ForgeFormat;
+  topic: string;
+  title: string;
+  note?: string;
+  difficulty: string;
+  source: 'gemini' | 'solver' | 'fallback';
+  puzzle: any; // solution-stripped, shape depends on format
 }
 
 export interface UserProfile {

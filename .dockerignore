@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.data
+.env
+.env.*
+!.env.example
+google-cloud-sdk
+google-cloud-cli-linux-x86_64.tar.gz
+*.md
+*.log
+.DS_Store

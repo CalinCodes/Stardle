@@ -102,7 +102,7 @@ export default function CalibrationRiddleGame({
           }
 
           setFeedback(`🏆 CORRECT! ${alertMsg}`);
-          onSuccess(Math.max(10, 100 - updated.length * 10), updated.length);
+          onSuccess(Math.max(5, 100 - updated.length * 18), updated.length);
         } else {
           synth.playTargetSound('wrong');
         }

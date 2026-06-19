@@ -21,17 +21,38 @@ export default function NegotiationGame({ isInfinite, username, onSuccess }: Neg
   const [infiniteIndex, setInfiniteIndex] = useState(0);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [dealClosed, setDealClosed] = useState(false);
+  const [merchant, setMerchant] = useState('');
+  const [item, setItem] = useState('');
+  const [startingPrice, setStartingPrice] = useState(0);
 
-  const activeSeed = isInfinite ? infiniteIndex : 0;
-
-  const handleNextInfinite = () => {
-    synth.playTargetSound('unlock');
+  const fetchNew = async () => {
+    setLoading(true);
     setChat([]);
     setPitch('');
     setDealClosed(false);
     setCurrentPrice(null);
-    setInfiniteIndex(prev => prev + 1);
-    setFeedback('A new stubborn merchant appears with a ridiculous price.');
+    setFeedback('A new merchant is setting up shop…');
+    try {
+      const res = await fetch('/api/games/negotiation/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const d = await res.json();
+      setMerchant(d.merchant || 'A stubborn merchant');
+      setItem(d.item || 'a mysterious item');
+      setStartingPrice(d.startingPrice || 1000);
+      setCurrentPrice(d.startingPrice || 1000);
+      setFeedback('Make your pitch — you have 3 sentences to haggle them down.');
+    } catch {
+      setFeedback('Could not reach the market — try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => { fetchNew(); }, []);
+
+  const handleNextInfinite = () => {
+    synth.playTargetSound('unlock');
+    setInfiniteIndex((prev) => prev + 1);
+    fetchNew();
   };
 
   const submitPitch = async (e: React.FormEvent) => {
@@ -49,8 +70,9 @@ export default function NegotiationGame({ isInfinite, username, onSuccess }: Neg
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pitch: pitch.trim(),
-          isInfinite,
-          activeIndex: activeSeed,
+          merchant,
+          item,
+          startingPrice,
           history: chat
         })
       });
@@ -78,7 +100,9 @@ export default function NegotiationGame({ isInfinite, username, onSuccess }: Neg
           // Assuming starting price varies, normalize score out of 100
           // Let's just reward a flat logic based on price reduction
           const reduction = result.startingPrice - result.newPrice;
-          const score = Math.max(10, Math.min(100, Math.floor((reduction / result.startingPrice) * 150))); 
+          // Harsh: only a closed deal pays well; walking away barely scores.
+          const base = Math.max(0, Math.min(100, Math.floor((reduction / result.startingPrice) * 100)));
+          const score = result.dealAccepted ? Math.max(10, base) : Math.floor(base * 0.25);
           onSuccess(score, updatedChat.filter(m => m.role === 'user').length);
         }
       }
@@ -105,16 +129,19 @@ export default function NegotiationGame({ isInfinite, username, onSuccess }: Neg
           <TrendingDown className="w-4 h-4 fill-yellow-400 text-yellow-400" />
           Active Trade Offer
         </span>
-        {isInfinite && (
-          <button onClick={handleNextInfinite} className="text-[10px] font-mono hover:text-yellow-400 flex items-center gap-1 cursor-pointer">
-            <RefreshCw className="w-3 h-3" /> Skip / Next Merchant
-          </button>
-        )}
+        <button onClick={handleNextInfinite} className="text-[10px] font-mono hover:text-yellow-400 flex items-center gap-1 cursor-pointer">
+          <RefreshCw className="w-3 h-3" /> Skip / Next Merchant
+        </button>
       </div>
 
       <div className="retro-card p-5 bg-white rounded-none flex flex-col gap-4 min-h-[300px]">
         {/* Deal info */}
         <div className="flex flex-col items-center gap-2 p-4 bg-stone-50 border border-stone-200">
+           {item && (
+             <p className="text-xs font-display text-center leading-snug mb-1">
+               <span className="font-bold">{merchant}</span> is selling <span className="font-bold">{item}</span>
+             </p>
+           )}
            <span className="text-[10px] font-mono uppercase text-stone-400 tracking-widest">Current Asking Price</span>
            {currentPrice ? (
              <span className="text-4xl font-black font-display text-green-700 tracking-tighter">

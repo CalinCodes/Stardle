@@ -1,0 +1,12 @@
+# Keep the Cloud Build upload small — exclude the local gcloud SDK, deps, secrets.
+.git
+node_modules
+dist
+.data
+.env
+.env.local
+google-cloud-sdk
+google-cloud-cli-linux-x86_64.tar.gz
+*.log
+.DS_Store
+daily-games-app-build-prompt.md

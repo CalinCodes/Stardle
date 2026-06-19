@@ -15,19 +15,21 @@ export default function DialectDecoderGame({ isInfinite, username, onSuccess }: 
   const [infiniteIndex, setInfiniteIndex] = useState(0);
   const [attempts, setAttempts] = useState<string[]>([]);
   const [currentPlot, setCurrentPlot] = useState<{style: string, text: string} | null>(null);
+  const [puzzleId, setPuzzleId] = useState('');
   const [dealClosed, setDealClosed] = useState(false);
 
   const loadPlot = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/games/dialect/get', {
+      const res = await fetch('/api/games/dialect/new', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isInfinite, activeIndex: infiniteIndex })
+        body: '{}'
       });
       if (res.ok) {
         const data = await res.json();
         setCurrentPlot({ style: data.style, text: data.text });
+        setPuzzleId(data.id);
       }
     } catch (err) {
       console.error(err);
@@ -61,8 +63,7 @@ export default function DialectDecoderGame({ isInfinite, username, onSuccess }: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           guess: guess.trim(),
-          isInfinite,
-          activeIndex: infiniteIndex
+          puzzleId,
         })
       });
 
@@ -76,7 +77,7 @@ export default function DialectDecoderGame({ isInfinite, username, onSuccess }: 
         if (result.correct) {
           synth.playTargetSound('win');
           setDealClosed(true);
-          onSuccess(Math.max(10, 100 - updated.length * 15), updated.length);
+          onSuccess(Math.max(5, 100 - updated.length * 20), updated.length);
         } else {
           synth.playTargetSound('wrong');
         }
@@ -103,11 +104,9 @@ export default function DialectDecoderGame({ isInfinite, username, onSuccess }: 
         <span className="font-display font-bold text-xs uppercase text-yellow-400">
           Listening to Channel
         </span>
-        {isInfinite && (
-          <button onClick={handleNextInfinite} className="text-[10px] font-mono hover:text-yellow-400 flex items-center gap-1 cursor-pointer">
-            <RefreshCw className="w-3 h-3" /> Skip / Next Plot
-          </button>
-        )}
+        <button onClick={handleNextInfinite} className="text-[10px] font-mono hover:text-yellow-400 flex items-center gap-1 cursor-pointer">
+          <RefreshCw className="w-3 h-3" /> Skip / Next Plot
+        </button>
       </div>
 
       <div className="retro-card p-5 bg-white rounded-none flex flex-col items-center gap-4">

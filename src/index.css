@@ -1,60 +1,205 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
+
+/* Make the `dark:` variant respond to a `.dark` class on <html> (not OS setting). */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", sans-serif;
+  --font-display: "Space Grotesk", "Inter", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
-/* Custom retro styling coordinates */
+/* ===================================================================== */
+/* Foundations — restrained, professional canvas                         */
+/* ===================================================================== */
+:root {
+  --accent: #facc15;        /* yellow */
+  --accent-2: #f59e0b;      /* amber */
+  --ink: #1e1b13;
+  --muted: #6b6456;
+  --surface: #ffffff;          /* solid, blocky cards */
+  --surface-line: #1e1b13;     /* thick black borders */
+  --shadow: 4px 4px 0 #1e1b13; /* hard offset "sticker" shadow */
+}
+
+.dark {
+  --ink: #f4efe2;
+  --muted: #a9a08c;
+  --surface: #211e17;
+  --surface-line: #000000;
+  --shadow: 4px 4px 0 #000000;
+}
+
+html, body { min-height: 100%; }
+
 body {
   font-family: var(--font-sans);
-  background-color: #fdfaf2; /* Soft warm-wax background */
-  color: #1e1b13;
+  color: var(--ink);
+  background-color: #fdfaf2;
+  background-image:
+    radial-gradient(900px 600px at 12% -8%, rgba(250, 204, 21, 0.18), transparent 60%),
+    radial-gradient(800px 600px at 100% 0%, rgba(245, 158, 11, 0.12), transparent 55%),
+    radial-gradient(700px 600px at 50% 115%, rgba(251, 191, 36, 0.10), transparent 55%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* Vibrant Yellow Golden glow key animations */
-@keyframes pulseGlow {
-  0%, 100% {
-    box-shadow: 0 0 5px rgba(245, 158, 11, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(245, 158, 11, 0.85);
-  }
+.dark body {
+  background-color: #17150f;
+  background-image:
+    radial-gradient(900px 600px at 12% -8%, rgba(250, 204, 21, 0.16), transparent 60%),
+    radial-gradient(800px 600px at 100% 0%, rgba(245, 158, 11, 0.12), transparent 55%),
+    radial-gradient(700px 600px at 50% 115%, rgba(251, 191, 36, 0.08), transparent 55%);
 }
 
-.yellow-glow {
-  animation: pulseGlow 2s infinite ease-in-out;
+/* Very subtle, slow ambient depth (no carnival colours) */
+@keyframes floatBlob {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(30px, -24px); }
+}
+.aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.aurora::before, .aurora::after {
+  content: ""; position: absolute; width: 38vw; height: 38vw; border-radius: 50%;
+  filter: blur(110px); opacity: 0.30; animation: floatBlob 26s ease-in-out infinite;
+}
+.aurora::before { background: radial-gradient(circle, var(--accent), transparent 70%); top: -8%; left: -6%; }
+.aurora::after { background: radial-gradient(circle, var(--accent-2), transparent 70%); bottom: -12%; right: -6%; animation-delay: -13s; }
+
+/* ===================================================================== */
+/* Glass surfaces                                                         */
+/* ===================================================================== */
+.glass {
+  background: var(--surface);
+  border: 2px solid var(--surface-line);
+  box-shadow: 2px 2px 0 var(--surface-line);
+  border-radius: 0;
 }
 
-/* Neobrutalist tactile card definitions */
+.glass-strong {
+  background: var(--surface);
+  border: 2px solid var(--surface-line);
+  box-shadow: 2px 2px 0 var(--surface-line);
+  border-radius: 0;
+}
+
+/* Existing components use .retro-card — the signature blocky box. */
 .retro-card {
-  background-color: #ffffff;
-  border: 3px solid #1e1b13;
-  box-shadow: 4px 4px 0px #1e1b13;
-  transition: all 0.2s ease-out;
+  background: var(--surface);
+  border: 3px solid var(--surface-line);
+  border-radius: 0;
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
+.retro-card:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--surface-line); }
 
-.retro-card:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0px #1e1b13;
-}
-
-.retro-button {
-  background-color: #fca5a5; /* Red soft */
-  border: 2px solid #1e1b13;
-  box-shadow: 2px 2px 0px #1e1b13;
-  transition: all 0.1s ease-out;
-}
-
-.retro-button:active {
-  transform: translate(2px, 2px);
-  box-shadow: 0px 0px 0px #1e1b13;
-}
-
-.yellow-active-tab {
-  background-color: #facc15; /* Golden Yellow */
-  border-color: #1e1b13;
+/* Tabs / menu items */
+.glass-tab { border-radius: 0; transition: all 0.12s ease; border: 2px solid transparent; color: var(--muted); }
+.glass-tab:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--ink); }
+.glass-tab[data-active="true"] {
+  background: var(--accent);
+  color: #1e1b13;
+  border-color: var(--surface-line);
+  box-shadow: 2px 2px 0 var(--surface-line);
   font-weight: 700;
+}
+
+/* Buttons */
+.glass-btn {
+  border-radius: 0;
+  background: var(--surface);
+  border: 2px solid var(--surface-line);
+  box-shadow: 2px 2px 0 var(--surface-line);
+  color: var(--ink);
+  transition: all 0.12s ease;
+}
+.glass-btn:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--surface-line); }
+.glass-btn:active { transform: translate(0, 0); box-shadow: 1px 1px 0 var(--surface-line); }
+
+.accent-btn {
+  border-radius: 0;
+  background: var(--accent);
+  color: #1e1b13;
+  border: 2px solid var(--surface-line);
+  box-shadow: 3px 3px 0 var(--surface-line);
+  font-weight: 700;
+  transition: all 0.12s ease;
+}
+.accent-btn:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--surface-line); }
+.accent-btn:active { transform: translate(0, 0); box-shadow: 1px 1px 0 var(--surface-line); }
+.accent-btn:disabled { opacity: 0.5; box-shadow: 2px 2px 0 var(--surface-line); }
+
+/* Blocky wordmark — solid, high-contrast */
+.brand-text { color: var(--ink); }
+
+input, textarea { border-radius: 10px; color: var(--ink); }
+input::placeholder { color: var(--muted); opacity: 0.7; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 35%, transparent); border-radius: 9999px; }
+
+@keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.animate-fade-in { animation: fade-in 0.28s ease-out; }
+
+/* ===================================================================== */
+/* Modernise the legacy neobrutalist utilities used by older games       */
+/* (soften the hard black 2px borders + sticker shadows into clean glass) */
+/* ===================================================================== */
+[class*="shadow-[2px_2px_0"],
+[class*="shadow-[3px_3px_0"],
+[class*="shadow-[4px_4px_0"],
+[class*="shadow-[1px_1px_0"] {
+  box-shadow: var(--shadow) !important;
+}
+
+.border-\[\#1e1b13\] { border-color: var(--surface-line) !important; }
+.dark .border-\[\#1e1b13\] { border-color: var(--surface-line) !important; }
+.border-stone-200, .border-stone-300, .border-stone-350 { border-color: var(--surface-line) !important; }
+
+/* Soften the heavy dark header bars used inside some games */
+.bg-\[\#1e1b13\] { background-color: color-mix(in srgb, var(--ink) 92%, transparent) !important; }
+.dark .bg-\[\#1e1b13\] { background-color: rgba(255,255,255,0.06) !important; }
+
+/* Neutralise the warm "wax" page colour some components hardcode */
+.bg-\[\#fdfaf2\] { background: transparent !important; }
+.text-\[\#1e1b13\] { color: var(--ink) !important; }
+.text-yellow-950 { color: var(--ink) !important; }
+
+/* Legacy white/stone fills → glass-consistent surfaces in dark mode */
+.dark .bg-white { background-color: rgba(255,255,255,0.04) !important; color: var(--ink) !important; }
+.dark .bg-stone-50, .dark .bg-stone-100 { background-color: rgba(255,255,255,0.05) !important; }
+.dark .text-stone-500, .dark .text-stone-600, .dark .text-stone-700, .dark .text-stone-800 { color: var(--muted) !important; }
+.dark input, .dark textarea { background-color: rgba(255,255,255,0.06) !important; }
+
+/* Dark mode: flip hardcoded dark text to light so it stays readable on dark surfaces */
+.dark .text-black,
+.dark .text-stone-900,
+.dark .text-stone-950 { color: var(--ink) !important; }
+
+/* …but keep text dark where it sits on a yellow/amber fill (defined AFTER, so it wins) */
+.dark .bg-yellow-300,
+.dark .bg-yellow-350,
+.dark .bg-yellow-400,
+.dark .bg-amber-300,
+.dark .bg-amber-400 { color: #1e1b13 !important; }
+
+/* Blocky look: flatten the soft ambient glow and square off rounded corners */
+.aurora { display: none !important; }
+.rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl { border-radius: 0 !important; }
+input, textarea, .glass, .glass-strong, .glass-btn, .accent-btn, .retro-card { border-radius: 0 !important; }
+
+/* Dark "screen" panels keep LIGHT text in BOTH themes. In the white theme the
+   global overrides were forcing these to dark text → unreadable on dark panels. */
+.bg-stone-900, .bg-stone-800, .bg-\[\#1e1b13\] { color: #f4efe2; }
+
+.bg-stone-900 .text-\[\#1e1b13\], .bg-stone-800 .text-\[\#1e1b13\], .bg-\[\#1e1b13\] .text-\[\#1e1b13\],
+.bg-stone-900 .text-yellow-950, .bg-stone-800 .text-yellow-950, .bg-\[\#1e1b13\] .text-yellow-950,
+.bg-stone-900 .text-black, .bg-stone-800 .text-black, .bg-\[\#1e1b13\] .text-black,
+.bg-stone-900 .text-stone-400, .bg-stone-800 .text-stone-400, .bg-\[\#1e1b13\] .text-stone-400,
+.bg-stone-900 .text-stone-500, .bg-stone-800 .text-stone-500, .bg-\[\#1e1b13\] .text-stone-500,
+.bg-stone-900 .text-stone-600, .bg-stone-800 .text-stone-600, .bg-\[\#1e1b13\] .text-stone-600,
+.bg-stone-900 .text-stone-700, .bg-stone-800 .text-stone-700, .bg-\[\#1e1b13\] .text-stone-700,
+.bg-stone-900 .text-stone-800, .bg-stone-800 .text-stone-800, .bg-\[\#1e1b13\] .text-stone-800 {
+  color: #f4efe2 !important;
 }

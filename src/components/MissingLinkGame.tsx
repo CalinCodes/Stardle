@@ -20,10 +20,10 @@ export default function MissingLinkGame({ isInfinite, username, onSuccess }: Mis
   const loadWords = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/games/missinglink/get', {
+      const res = await fetch('/api/games/missinglink/new', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isInfinite, activeIndex: infiniteIndex })
+        body: '{}'
       });
       if (res.ok) {
         const data = await res.json();
@@ -61,8 +61,8 @@ export default function MissingLinkGame({ isInfinite, username, onSuccess }: Mis
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sentence: sentence.trim(),
-          isInfinite,
-          activeIndex: infiniteIndex
+          wordA: currentWords?.wordA,
+          wordB: currentWords?.wordB,
         })
       });
 
@@ -70,7 +70,7 @@ export default function MissingLinkGame({ isInfinite, username, onSuccess }: Mis
         const result = await res.json();
         setScoreObj({ score: result.score, explanation: result.explanation });
         
-        if (result.score >= 50) {
+        if (result.score >= 70) {
           synth.playTargetSound('win');
           setFeedback('Valid connection accepted!');
           setDealClosed(true);
@@ -102,11 +102,9 @@ export default function MissingLinkGame({ isInfinite, username, onSuccess }: Mis
         <span className="font-display font-bold text-xs uppercase text-yellow-400">
           Semantic Bridge Builder
         </span>
-        {isInfinite && (
-          <button onClick={handleNextInfinite} className="text-[10px] font-mono hover:text-yellow-400 flex items-center gap-1 cursor-pointer">
-            <RefreshCw className="w-3 h-3" /> Skip / Next Words
-          </button>
-        )}
+        <button onClick={handleNextInfinite} className="text-[10px] font-mono hover:text-yellow-400 flex items-center gap-1 cursor-pointer">
+          <RefreshCw className="w-3 h-3" /> Skip / Next Words
+        </button>
       </div>
 
       <div className="retro-card p-5 bg-white rounded-none flex flex-col items-center gap-6">

@@ -16,15 +16,46 @@ export default function SynonymSeekersGame({ isInfinite, username, onSuccess }: 
   const [infiniteIndex, setInfiniteIndex] = useState(0);
   const [clueText, setClueText] = useState('');
   const [hintsUsed, setHintsUsed] = useState(0);
-  const [feedback, setFeedback] = useState('Type your first guess relative to the target theme above!');
+  const [feedback, setFeedback] = useState('Loading a fresh hidden word…');
+  const [puzzleId, setPuzzleId] = useState('');
+  const [category, setCategory] = useState('');
+  const [hints, setHints] = useState<string[]>([]);
+
+  const fetchNew = async () => {
+    setLoading(true);
+    setGuesses([]);
+    setHintsUsed(0);
+    setClueText('');
+    setFeedback('A new secret word is ready — start guessing by meaning!');
+    try {
+      const res = await fetch('/api/games/semantic/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const d = await res.json();
+      setPuzzleId(d.id);
+      setCategory(d.category || '');
+      setHints(d.hints || []);
+    } catch {
+      setFeedback('Could not load a word — try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => { fetchNew(); }, []);
 
   const handleNextInfinite = () => {
     synth.playTargetSound('unlock');
-    setGuesses([]);
-    setInfiniteIndex(prev => prev + 1);
-    setClueText('');
-    setHintsUsed(0);
-    setFeedback('Loaded fresh hidden word. Guess away!');
+    setInfiniteIndex((prev) => prev + 1);
+    fetchNew();
+  };
+
+  const revealClue = () => {
+    synth.playTargetSound('click');
+    if (hintsUsed < hints.length) {
+      setFeedback(`🔍 Clue: ${hints[hintsUsed]}`);
+      setHintsUsed((h) => h + 1);
+    } else {
+      setFeedback('No more clues — trust your instincts!');
+    }
   };
 
   const submitGuess = async (e: React.FormEvent) => {
@@ -38,8 +69,7 @@ export default function SynonymSeekersGame({ isInfinite, username, onSuccess }: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           guess: guess.trim(),
-          isInfinite,
-          activeIndex: infiniteIndex
+          puzzleId,
         })
       });
 
@@ -62,7 +92,7 @@ export default function SynonymSeekersGame({ isInfinite, username, onSuccess }: 
         if (result.status === 'exact') {
           synth.playTargetSound('win');
           setFeedback('🏆 ABSOLUTELY SPOT ON! You discovered the hidden secret word.');
-          onSuccess(Math.max(10, 100 - hintsUsed * 10 - updated.length * 2), updated.length);
+          onSuccess(Math.max(5, 100 - hintsUsed * 15 - updated.length * 7), updated.length);
         } else {
           setFeedback(result.clueFeedback || 'Fascinating. Check the similarity temperature below!');
           if (result.score > 70) {
@@ -123,17 +153,15 @@ export default function SynonymSeekersGame({ isInfinite, username, onSuccess }: 
           <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
           <span className="font-display font-medium text-xs tracking-wide">Category:</span>
           <span className="font-display font-bold text-xs uppercase bg-yellow-400 text-black px-2 py-0.5">
-            {isInfinite ? "Infinite Rotation Science" : "Daily Canopy"}
+            {category || 'Loading…'}
           </span>
         </div>
-        {isInfinite && (
-          <button
-            onClick={handleNextInfinite}
-            className="text-[10px] font-mono hover:text-yellow-400 flex items-center gap-1 cursor-pointer"
-          >
-            <RefreshCw className="w-3 h-3" /> Skip / Next
-          </button>
-        )}
+        <button
+          onClick={handleNextInfinite}
+          className="text-[10px] font-mono hover:text-yellow-400 flex items-center gap-1 cursor-pointer"
+        >
+          <RefreshCw className="w-3 h-3" /> Skip / Next
+        </button>
       </div>
 
       {/* Main play canvas */}
@@ -164,6 +192,12 @@ export default function SynonymSeekersGame({ isInfinite, username, onSuccess }: 
               {loading ? "Aligning..." : "SUBMIT"}
             </button>
           </form>
+        )}
+
+        {!hasWon && hints.length > 0 && (
+          <button type="button" onClick={revealClue} className="self-start text-[11px] font-mono text-amber-700 hover:text-amber-800">
+            ❔ Reveal a clue ({hintsUsed}/{hints.length} used)
+          </button>
         )}
 
         {/* Guesses Log */}

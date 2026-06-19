@@ -17,30 +17,37 @@ export default function DailyDetectiveGame({ isInfinite, username, onSuccess }: 
   const [loading, setLoading] = useState(false);
   const [solved, setSolved] = useState(false);
   const [infiniteIndex, setInfiniteIndex] = useState(0);
+  const [setup, setSetup] = useState('');
+  const [puzzleId, setPuzzleId] = useState('');
 
-  const SETUPS = [
-    {
-      setup: "A man is found dead in a room with only a puddle of water and a locked door. No hanging cables, no weapons or poison present. How did he die?",
-      fallbackClues: ["The puddle was originally in a different state.", "Think vertically.", "The room temperature melted something."]
-    },
-    {
-      setup: "A woman buys a brand new pair of shoes, wears them to work, and dies exactly three hours later. Why did she die?",
-      fallbackClues: ["Her profession involves sharp Flying projectiles.", "A slight difference in height was fatal.", "She works in a circus entertainment ring."]
-    }
-  ];
-
-  const handleNextInfinite = () => {
-    synth.playTargetSound('unlock');
+  const fetchNew = async () => {
+    setLoading(true);
     setQuestions([]);
     setExplanation('');
     setSolved(false);
-    setInfiniteIndex(prev => prev + 1);
-    setFeedback('New detective mystery file loaded. Initiate YES/NO interrogation.');
+    setFeedback('A fresh mystery is loading…');
+    try {
+      const res = await fetch('/api/games/detective/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const d = await res.json();
+      setSetup(d.setup || '');
+      setPuzzleId(d.id);
+      setFeedback('Ask up to 10 yes/no questions, then submit your explanation.');
+    } catch {
+      setFeedback('Could not load a case — try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const getActiveSetup = () => {
-    return SETUPS[infiniteIndex % SETUPS.length].setup;
+  React.useEffect(() => { fetchNew(); }, []);
+
+  const handleNextInfinite = () => {
+    synth.playTargetSound('unlock');
+    setInfiniteIndex((prev) => prev + 1);
+    fetchNew();
   };
+
+  const getActiveSetup = () => setup;
 
   const submitQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,8 +65,7 @@ export default function DailyDetectiveGame({ isInfinite, username, onSuccess }: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question: question.trim(),
-          isInfinite,
-          activeIndex: infiniteIndex
+          puzzleId,
         })
       });
 
@@ -94,8 +100,7 @@ export default function DailyDetectiveGame({ isInfinite, username, onSuccess }: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           explanation: explanation.trim(),
-          isInfinite,
-          activeIndex: infiniteIndex
+          puzzleId,
         })
       });
 
@@ -105,7 +110,7 @@ export default function DailyDetectiveGame({ isInfinite, username, onSuccess }: 
         if (result.solved) {
           synth.playTargetSound('win');
           setSolved(true);
-          onSuccess(Math.max(20, 150 - questions.length * 15), questions.length);
+          onSuccess(Math.max(5, 100 - questions.length * 12), questions.length);
         } else {
           synth.playTargetSound('wrong');
         }
@@ -132,14 +137,12 @@ export default function DailyDetectiveGame({ isInfinite, username, onSuccess }: 
         <span className="font-display font-bold text-xs uppercase text-yellow-400 flex items-center gap-1.5 animate-pulse">
           🚨 Active Crime Scene Interrogator
         </span>
-        {isInfinite && (
-          <button
-            onClick={handleNextInfinite}
-            className="text-[10px] font-mono hover:text-yellow-400 flex items-center gap-1 cursor-pointer"
-          >
-            <RefreshCw className="w-3 h-3" /> Skip / Next Case
-          </button>
-        )}
+        <button
+          onClick={handleNextInfinite}
+          className="text-[10px] font-mono hover:text-yellow-400 flex items-center gap-1 cursor-pointer"
+        >
+          <RefreshCw className="w-3 h-3" /> Skip / Next Case
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-5">

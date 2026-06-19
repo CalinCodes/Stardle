@@ -1,6 +1,5 @@
 import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
@@ -16,16 +15,47 @@ import {
   MISSINGLINK_POOL,
   getSeededIndex
 } from './src/data/puzzles.ts';
+import {
+  generatePuzzle,
+  toClientPayload,
+  checkGuess,
+  ALL_FORMATS,
+  type ForgeFormat
+} from './src/engines/forge.ts';
+import {
+  savePuzzle,
+  getPuzzle,
+  listPuzzles,
+  addScore,
+  getLeaderboard
+} from './src/data/store.ts';
 
+// Load .env.local first (AI Studio convention), then fall back to .env
+dotenv.config({ path: '.env.local' });
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
 
-const PORT = 3000;
+// Never let a malformed request body crash the process — return 400 instead.
+app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err && err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Invalid JSON body' });
+  }
+  next(err);
+});
+
+const PORT = Number(process.env.PORT) || 3000;
+
+// Single source of truth for the model id. Override with GEMINI_MODEL in env.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+
+// Simple unique id generator for generated puzzles.
+let puzzleCounter = 0;
+function newPuzzleId(format: string): string {
+  puzzleCounter += 1;
+  return `${format}-${Date.now().toString(36)}-${puzzleCounter}`;
+}
 
 // Lazy initialize Gemini client to avoid crashes if API Key is missing.
 let aiInstance: GoogleGenAI | null = null;
@@ -175,7 +205,10 @@ app.post('/api/games/semantic/guess', async (req, res) => {
   // Determine current active target
   let target = "Volcano";
   const dateStr = date || new Date().toISOString().split('T')[0];
-  if (isInfinite && typeof activeIndex === 'number') {
+  const storedSem = req.body.puzzleId ? getPuzzle(req.body.puzzleId) : null;
+  if (storedSem) {
+    target = storedSem.payload.word;
+  } else if (isInfinite && typeof activeIndex === 'number') {
     target = SEMANTIC_POOL[activeIndex % SEMANTIC_POOL.length].word;
   } else {
     const sIndex = getSeededIndex(dateStr + "semantic", SEMANTIC_POOL.length);
@@ -210,7 +243,7 @@ Strict Guidelines:
 - Keep it responsive, fun, and witty. Explain the connection.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: GEMINI_MODEL,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -289,7 +322,7 @@ Rule:
 - If similarity is 90% or greater, set completed: true.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: GEMINI_MODEL,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -333,7 +366,10 @@ app.post('/api/games/zeitgeist/guess', async (req, res) => {
   
   let targetAnswer = "Jurassic Park";
   const dateStr = date || new Date().toISOString().split('T')[0];
-  if (isInfinite && typeof activeIndex === 'number') {
+  const storedZ = req.body.puzzleId ? getPuzzle(req.body.puzzleId) : null;
+  if (storedZ) {
+    targetAnswer = storedZ.payload.answer;
+  } else if (isInfinite && typeof activeIndex === 'number') {
     targetAnswer = ZEITGEIST_POOL[activeIndex % ZEITGEIST_POOL.length].answer;
   } else {
     const zIndex = getSeededIndex(dateStr + "zeitgeist", ZEITGEIST_POOL.length);
@@ -352,7 +388,7 @@ Compare them for conceptual equivalent, allowing minor typos, abbreviations, or 
 Provide friendly emoji responses.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: GEMINI_MODEL,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -393,7 +429,11 @@ app.post('/api/games/detective/question', async (req, res) => {
   let setup = "";
   let solution = "";
   const dateStr = date || new Date().toISOString().split('T')[0];
-  if (isInfinite && typeof activeIndex === 'number') {
+  const storedDet = req.body.puzzleId ? getPuzzle(req.body.puzzleId) : null;
+  if (storedDet) {
+    setup = storedDet.payload.setup;
+    solution = storedDet.payload.solution;
+  } else if (isInfinite && typeof activeIndex === 'number') {
     const preset = DETECTIVE_POOL[activeIndex % DETECTIVE_POOL.length];
     setup = preset.setup;
     solution = preset.secretSolution;
@@ -420,7 +460,7 @@ Choose "NO" if it contradicts the truth.
 Choose "IRRELEVANT" if it deals with details that don't help solve the central melting block of ice or circus Knife thrower puzzle variables.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: GEMINI_MODEL,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -473,7 +513,11 @@ app.post('/api/games/detective/solve', async (req, res) => {
   let setup = "";
   let solution = "";
   const dateStr = date || new Date().toISOString().split('T')[0];
-  if (isInfinite && typeof activeIndex === 'number') {
+  const storedDet = req.body.puzzleId ? getPuzzle(req.body.puzzleId) : null;
+  if (storedDet) {
+    setup = storedDet.payload.setup;
+    solution = storedDet.payload.solution;
+  } else if (isInfinite && typeof activeIndex === 'number') {
     const preset = DETECTIVE_POOL[activeIndex % DETECTIVE_POOL.length];
     setup = preset.setup;
     solution = preset.secretSolution;
@@ -497,7 +541,7 @@ Is the user's explanation conceptually correct? Do they recognize the core mecha
 Provide a friendly verdict with a beautiful explanation of the mystery.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: GEMINI_MODEL,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -556,7 +600,7 @@ The player guessed: "${cleanGuess}"
 Determine if this is correct, allowing synonyms or plural formats. Provide witty, poetic riddle feedback.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: GEMINI_MODEL,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -619,7 +663,7 @@ ${diffInstruction}
 Generate a unique, elegant riddle with a simple single-word answer.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: GEMINI_MODEL,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -672,9 +716,10 @@ app.post('/api/games/negotiation/barter', async (req, res) => {
 
   const ai = getGeminiClient();
   const preset = NEGOTIATION_POOL[isInfinite ? activeIndex % NEGOTIATION_POOL.length : getSeededIndex(new Date().toISOString().split('T')[0], NEGOTIATION_POOL.length)];
-  const merchant = preset.merchant;
-  const item = preset.item;
-  const startPrice = preset.startingPrice;
+  // AI-generated merchants are passed in from the client; fall back to the pool.
+  const merchant = req.body.merchant || preset.merchant;
+  const item = req.body.item || preset.item;
+  const startPrice = req.body.startingPrice || preset.startingPrice;
 
   // Determine current price based on history length if fallback
   let fallbackPrice = startPrice - (history.length * 50);
@@ -706,7 +751,7 @@ Respond in JSON format with:
 - "dealAccepted": boolean (true if you agree to their terms and close the deal).`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -746,9 +791,11 @@ app.post('/api/games/dialect/guess', async (req, res) => {
   const { guess, isInfinite, activeIndex } = req.body;
   const ai = getGeminiClient();
   const preset = DIALECT_POOL[isInfinite ? activeIndex % DIALECT_POOL.length : getSeededIndex(new Date().toISOString().split('T')[0], DIALECT_POOL.length)];
+  const storedDia = req.body.puzzleId ? getPuzzle(req.body.puzzleId) : null;
+  const answer = storedDia ? storedDia.payload.answer : preset.answer;
 
-  if (guess.toLowerCase() === preset.answer.toLowerCase()) {
-    return res.json({ correct: true, feedback: `Exact match! The answer was ${preset.answer}.` });
+  if (guess.toLowerCase() === answer.toLowerCase()) {
+    return res.json({ correct: true, feedback: `Exact match! The answer was ${answer}.` });
   }
 
   if (!ai) {
@@ -756,7 +803,7 @@ app.post('/api/games/dialect/guess', async (req, res) => {
   }
 
   try {
-    const prompt = `The target answer is "${preset.answer}". 
+    const prompt = `The target answer is "${answer}".
 The user guessed "${guess}".
 Did the user correctly identify or closely guess the target subject conceptually?
 Provide a JSON response:
@@ -764,7 +811,7 @@ Provide a JSON response:
 - "feedback": A short hint or confirmation.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -805,12 +852,15 @@ app.post('/api/games/missinglink/score', async (req, res) => {
   const { sentence, isInfinite, activeIndex } = req.body;
   const ai = getGeminiClient();
   const preset = MISSINGLINK_POOL[isInfinite ? activeIndex % MISSINGLINK_POOL.length : getSeededIndex(new Date().toISOString().split('T')[0], MISSINGLINK_POOL.length)];
+  // AI-generated pairs are passed from the client; fall back to the pool.
+  const wordA = req.body.wordA || preset.wordA;
+  const wordB = req.body.wordB || preset.wordB;
 
   if (!sentence) return res.status(400).json({ error: "Missing sentence" });
 
   if (!ai) {
-    const aLower = preset.wordA.toLowerCase();
-    const bLower = preset.wordB.toLowerCase();
+    const aLower = wordA.toLowerCase();
+    const bLower = wordB.toLowerCase();
     const sentLower = sentence.toLowerCase();
     const hasBoth = sentLower.includes(aLower) && sentLower.includes(bLower);
     
@@ -822,7 +872,7 @@ app.post('/api/games/missinglink/score', async (req, res) => {
 
   try {
     const prompt = `Game: The Missing Link. Let's act as a semantic referee.
-Words to connect: "${preset.wordA}" and "${preset.wordB}".
+Words to connect: "${wordA}" and "${wordB}".
 User's sentence: "${sentence}"
 
 Evaluate if the sentence:
@@ -837,7 +887,7 @@ Return JSON:
 - "explanation": a short snappy review of their sentence logic.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -860,24 +910,267 @@ Return JSON:
   }
 });
 
-// 14. Submit Score to Leaderboard
+/* ========================================================================= */
+/* CLASSIC GAMES: infinite AI-generated content (fresh every time)           */
+/* ========================================================================= */
+
+async function aiGen(prompt: string, schema: any): Promise<any | null> {
+  const ai = getGeminiClient();
+  if (!ai) return null;
+  try {
+    const r = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: prompt,
+      config: { responseMimeType: 'application/json', responseSchema: schema },
+    });
+    return JSON.parse(r.text?.trim() || '{}');
+  } catch (e) {
+    console.error('[classic] gen error:', e);
+    return null;
+  }
+}
+
+function storeClassic(type: string, payload: any): string {
+  const id = newPuzzleId('classic-' + type);
+  savePuzzle({
+    id, format: 'classic:' + type, topic: type, difficulty: 'medium',
+    title: type, payload, source: 'gemini', createdAt: new Date().toISOString(),
+  });
+  return id;
+}
+
+// Emoji (zeitgeist) — fresh emoji rebus
+app.post('/api/games/zeitgeist/new', async (req, res) => {
+  const data = await aiGen(
+    `Invent a fresh "guess the thing from emojis" puzzle. Pick a well-known movie, song, place, historical event, brand or common idiom, then represent it with 4 to 6 emojis. Return JSON: { "emojis": [".."], "answer": "..", "category": "..", "clues": ["vague clue","medium clue","specific clue"] }. Keep it safe and broadly known.`,
+    { type: Type.OBJECT, properties: {
+      emojis: { type: Type.ARRAY, items: { type: Type.STRING } },
+      answer: { type: Type.STRING }, category: { type: Type.STRING },
+      clues: { type: Type.ARRAY, items: { type: Type.STRING } },
+    }, required: ['emojis', 'answer', 'category', 'clues'] },
+  );
+  if (data && Array.isArray(data.emojis) && data.emojis.length >= 3 && data.answer) {
+    const id = storeClassic('zeitgeist', data);
+    return res.json({ id, emojis: data.emojis, category: data.category || 'Pop culture', clues: data.clues || [] });
+  }
+  const p = ZEITGEIST_POOL[getSeededIndex(Date.now().toString(), ZEITGEIST_POOL.length)];
+  const id = storeClassic('zeitgeist', { emojis: p.emojis, answer: p.answer, category: p.category, clues: p.clues });
+  res.json({ id, emojis: p.emojis, category: p.category, clues: p.clues });
+});
+
+// Associations (semantic) — fresh secret word
+app.post('/api/games/semantic/new', async (req, res) => {
+  const data = await aiGen(
+    `Pick an interesting, guessable single secret word for a hot/cold word-association game, plus a category and 3 escalating hints that do NOT contain the word. Return JSON: { "word": "..", "category": "..", "hints": ["..","..",".."] }.`,
+    { type: Type.OBJECT, properties: {
+      word: { type: Type.STRING }, category: { type: Type.STRING },
+      hints: { type: Type.ARRAY, items: { type: Type.STRING } },
+    }, required: ['word', 'category', 'hints'] },
+  );
+  if (data && data.word) {
+    const id = storeClassic('semantic', data);
+    return res.json({ id, category: data.category || 'General', hints: data.hints || [] });
+  }
+  const p = SEMANTIC_POOL[getSeededIndex(Date.now().toString(), SEMANTIC_POOL.length)];
+  const id = storeClassic('semantic', { word: p.word, category: p.category, hints: p.hints });
+  res.json({ id, category: p.category, hints: p.hints });
+});
+
+// Disguise (dialect) — fresh stylized description
+app.post('/api/games/dialect/new', async (req, res) => {
+  const data = await aiGen(
+    `Describe a common thing/person/activity in a wildly specific voice or style (e.g. medieval knight, noir detective, surfer, Shakespeare) WITHOUT naming it. Return JSON: { "style": "the voice used", "answer": "the thing being described", "text": "the stylized description" }.`,
+    { type: Type.OBJECT, properties: { style: { type: Type.STRING }, answer: { type: Type.STRING }, text: { type: Type.STRING } }, required: ['style', 'answer', 'text'] },
+  );
+  if (data && data.answer && data.text) {
+    const id = storeClassic('dialect', data);
+    return res.json({ id, style: data.style || 'Mystery voice', text: data.text });
+  }
+  const p = DIALECT_POOL[getSeededIndex(Date.now().toString(), DIALECT_POOL.length)];
+  const id = storeClassic('dialect', { style: p.style, answer: p.answer, text: p.fallbackText });
+  res.json({ id, style: p.style, text: p.fallbackText });
+});
+
+// Mystery (detective) — fresh lateral-thinking puzzle
+app.post('/api/games/detective/new', async (req, res) => {
+  const data = await aiGen(
+    `Invent a fresh lateral-thinking mystery (like "a man lies dead in a field next to an unopened package"). Return JSON: { "setup": "the puzzling scenario", "solution": "the full explanation", "clues": ["nudge 1","nudge 2","nudge 3"] }. Solvable by yes/no questions.`,
+    { type: Type.OBJECT, properties: { setup: { type: Type.STRING }, solution: { type: Type.STRING }, clues: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ['setup', 'solution', 'clues'] },
+  );
+  if (data && data.setup && data.solution) {
+    const id = storeClassic('detective', data);
+    return res.json({ id, setup: data.setup, clues: data.clues || [] });
+  }
+  const p = DETECTIVE_POOL[getSeededIndex(Date.now().toString(), DETECTIVE_POOL.length)];
+  const id = storeClassic('detective', { setup: p.setup, solution: p.secretSolution, clues: p.clues });
+  res.json({ id, setup: p.setup, clues: p.clues });
+});
+
+// Bargain (negotiation) — fresh merchant + item
+app.post('/api/games/negotiation/new', async (req, res) => {
+  const data = await aiGen(
+    `Invent a colourful merchant and a quirky item they're selling for a haggling game, plus a starting price in gold (200-100000). Return JSON: { "merchant": "..", "item": "..", "startingPrice": number }.`,
+    { type: Type.OBJECT, properties: { merchant: { type: Type.STRING }, item: { type: Type.STRING }, startingPrice: { type: Type.INTEGER } }, required: ['merchant', 'item', 'startingPrice'] },
+  );
+  if (data && data.merchant && data.item && data.startingPrice) {
+    return res.json({ merchant: data.merchant, item: data.item, startingPrice: data.startingPrice });
+  }
+  const p = NEGOTIATION_POOL[getSeededIndex(Date.now().toString(), NEGOTIATION_POOL.length)];
+  res.json({ merchant: p.merchant, item: p.item, startingPrice: p.startingPrice });
+});
+
+// Connect (missing link) — fresh unrelated pair
+app.post('/api/games/missinglink/new', async (req, res) => {
+  const data = await aiGen(
+    `Give two random, genuinely unrelated things for a "connect these in one sentence" game (mix concrete and abstract). Return JSON: { "wordA": "..", "wordB": ".." }. Each 1-3 words, safe, not obviously related.`,
+    { type: Type.OBJECT, properties: { wordA: { type: Type.STRING }, wordB: { type: Type.STRING } }, required: ['wordA', 'wordB'] },
+  );
+  if (data && data.wordA && data.wordB) return res.json({ wordA: data.wordA, wordB: data.wordB });
+  const p = MISSINGLINK_POOL[getSeededIndex(Date.now().toString(), MISSINGLINK_POOL.length)];
+  res.json({ wordA: p.wordA, wordB: p.wordB });
+});
+
+/* ========================================================================= */
+/* FORGE: infinite, interest-driven, AI-generated games                      */
+/* ========================================================================= */
+
+// F1. Generate a brand-new puzzle from a free-text topic.
+//     body: { topic, format ('codex'|'wordgrid'|'connections'|'sudoku'|'quiz'|'surprise'), difficulty }
+app.post('/api/forge/generate', async (req, res) => {
+  const { topic, format, difficulty } = req.body || {};
+  if (!topic || !topic.toString().trim()) {
+    return res.status(400).json({ error: "Missing topic" });
+  }
+
+  const requested = (format || 'surprise') as ForgeFormat | 'surprise';
+  const validFormat =
+    requested === 'surprise' || ALL_FORMATS.includes(requested as ForgeFormat)
+      ? requested
+      : 'surprise';
+
+  try {
+    const ai = getGeminiClient();
+    const generated = await generatePuzzle(ai, GEMINI_MODEL, {
+      topic: topic.toString().trim(),
+      format: validFormat,
+      difficulty: difficulty || 'medium',
+    });
+
+    const id = newPuzzleId(generated.format);
+    savePuzzle({
+      id,
+      format: generated.format,
+      topic: generated.topic,
+      difficulty: generated.difficulty,
+      title: generated.title,
+      payload: generated.payload,
+      source: generated.source,
+      createdAt: new Date().toISOString(),
+    });
+
+    res.json({
+      id,
+      format: generated.format,
+      topic: generated.topic,
+      difficulty: generated.difficulty,
+      title: generated.title,
+      note: generated.note || '',
+      source: generated.source,
+      puzzle: toClientPayload(generated.format, generated.payload),
+    });
+  } catch (err) {
+    console.error("[forge] generate error:", err);
+    res.status(500).json({ error: "Generation failed" });
+  }
+});
+
+// F2. Check a guess/attempt against a generated puzzle (solution stays server-side).
+//     body: { puzzleId, guess }
+async function isRealWord(word: string): Promise<boolean> {
+  const w = (word || '').toLowerCase().replace(/[^a-z]/g, '');
+  if (w.length < 2) return false;
+  try {
+    const r = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(w)}`);
+    return r.ok; // 200 = a real dictionary word, 404 = not found
+  } catch {
+    return true; // if the dictionary is unreachable, don't block play
+  }
+}
+
+app.post('/api/forge/check', async (req, res) => {
+  const { puzzleId, guess } = req.body || {};
+  const stored = getPuzzle(puzzleId);
+  if (!stored) {
+    return res.status(404).json({ error: "Puzzle not found (it may have expired). Generate a new one." });
+  }
+  try {
+    // Word Grid: only accept guesses that are real dictionary words.
+    if (stored.format === 'wordgrid') {
+      const g = (guess || '').toUpperCase().replace(/[^A-Z]/g, '');
+      if (g.length === stored.payload.length && g !== stored.payload.answer && !(await isRealWord(g))) {
+        return res.json({ valid: false, message: 'Not a real word.' });
+      }
+    }
+    const result = checkGuess(stored.format as ForgeFormat, stored.payload, guess);
+    res.json(result);
+  } catch (err) {
+    console.error("[forge] check error:", err);
+    res.status(500).json({ error: "Check failed" });
+  }
+});
+
+// F3. Reveal the answer for a generated puzzle (used after a player gives up).
+app.post('/api/forge/reveal', (req, res) => {
+  const { puzzleId } = req.body || {};
+  const stored = getPuzzle(puzzleId);
+  if (!stored) return res.status(404).json({ error: "Puzzle not found" });
+  const p = stored.payload;
+  let answer: any = null;
+  switch (stored.format) {
+    case 'codex': answer = p.answer; break;
+    case 'wordgrid': answer = p.answer; break;
+    case 'quiz': answer = { answer: p.answer, explanation: p.explanation }; break;
+    case 'connections': answer = p.groups; break;
+    case 'sudoku': answer = p.solution; break;
+    case 'zip': answer = p.solutionPath; break;
+    case 'queens': answer = p.solution; break;
+  }
+  res.json({ answer });
+});
+
+// F4. Recently generated puzzles (community feed).
+app.get('/api/forge/recent', (req, res) => {
+  const limit = Math.min(parseInt((req.query.limit as string) || '12', 10), 50);
+  const items = listPuzzles(limit).map((p) => ({
+    id: p.id,
+    format: p.format,
+    topic: p.topic,
+    title: p.title,
+    difficulty: p.difficulty,
+    source: p.source,
+    createdAt: p.createdAt,
+  }));
+  res.json(items);
+});
+
+// 14. Submit Score to Leaderboard (persisted to disk)
 app.post('/api/games/leaderboard/submit', (req, res) => {
-  const { username, gameType, score, timeTaken, guessesCount, date } = req.body;
+  const { username, gameType, score, timeTaken, guessesCount, date, topic } = req.body;
   if (!username) {
     return res.status(400).json({ error: "Missing username" });
   }
 
-  const payload: ScoreboardEntry = {
+  addScore({
     username,
     gameType,
     score: score || 0,
     timeTaken: timeTaken || "1m 30s",
     guessesCount: guessesCount || 1,
-    date: date || new Date().toISOString().split('T')[0]
-  };
+    date: date || new Date().toISOString().split('T')[0],
+    topic
+  });
 
-  GLOBAL_LEADERBOARD.unshift(payload);
-  res.json({ success: true, leaderboard: GLOBAL_LEADERBOARD.slice(0, 100) });
+  res.json({ success: true });
 });
 
 // 11. Fetch Leaderboard for specific category
@@ -885,10 +1178,7 @@ app.get('/api/games/leaderboard', (req, res) => {
   const gameType = req.query.gameType as string;
   const dateStr = (req.query.date as string) || new Date().toISOString().split('T')[0];
 
-  let filtered = GLOBAL_LEADERBOARD.filter(item => item.date === dateStr);
-  if (gameType) {
-    filtered = filtered.filter(item => item.gameType === gameType);
-  }
+  const filtered = getLeaderboard({ date: dateStr, gameType: gameType || undefined });
 
   // Sort by score descending, guesses lower is better
   filtered.sort((a, b) => b.score - a.score || a.guessesCount - b.guessesCount);
