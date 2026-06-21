@@ -4,6 +4,7 @@
 
 Stardle is a collection of daily mini-games (wordplay, riddles, zeitgeist emoji puzzles, AI-prompt detective, and more) built with React + Vite and an Express server. The app can optionally use Google Gemini (GenAI) for smarter validation, falling back to local rule-based logic when the API key is not provided.
 
+<img width="1454" height="796" alt="image" src="https://github.com/user-attachments/assets/59dd0319-d5c3-4eb6-8d37-d96f829c46d5" />
 
 **Highlights**
 - Multiple game types: Synonym Seekers, Prompt Detective, Emoji Zeitgeist, Riddles, Detective puzzles, and more.
